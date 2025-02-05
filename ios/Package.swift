@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 5.6.2
 import PackageDescription
 
 let package = Package(
@@ -11,6 +11,7 @@ let package = Package(
             name: "DiscApp",
             targets: ["DiscApp"]),
     ],
+    dependencies: [],
     targets: [
         .target(
             name: "DiscApp",
