@@ -1,8 +1,11 @@
-import { InsertUser, User, Review, Event, insertUserSchema } from "@shared/schema";
+import { users, reviews, events, type User, type Review, type Event, type InsertUser } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -15,65 +18,48 @@ export interface IStorage {
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private reviews: Map<number, Review>;
-  private events: Map<number, Event>;
+export class DatabaseStorage implements IStorage {
   public sessionStore: session.Store;
-  currentId: number;
 
   constructor() {
-    this.users = new Map();
-    this.reviews = new Map();
-    this.events = new Map();
-    this.currentId = 1;
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      createTableIfMissing: true 
     });
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId++;
-    const user: User = { 
-      ...insertUser, 
-      id,
-      createdAt: new Date()
-    };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async getReviews(): Promise<Review[]> {
-    return Array.from(this.reviews.values());
+    return db.select().from(reviews);
   }
 
   async createReview(review: Review): Promise<Review> {
-    const id = this.currentId++;
-    this.reviews.set(id, { ...review, id });
-    return review;
+    const [newReview] = await db.insert(reviews).values(review).returning();
+    return newReview;
   }
 
   async getEvents(location: string): Promise<Event[]> {
-    return Array.from(this.events.values()).filter(
-      (event) => event.location === location
-    );
+    return db.select().from(events).where(eq(events.location, location));
   }
 
   async createEvent(event: Event): Promise<Event> {
-    const id = this.currentId++;
-    this.events.set(id, { ...event, id });
-    return event;
+    const [newEvent] = await db.insert(events).values(event).returning();
+    return newEvent;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
