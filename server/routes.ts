@@ -5,11 +5,12 @@ import { storage } from "./storage";
 import { generateRecommendation, analyzeSentiment } from "./openai";
 import { insertArtistSchema, insertAlbumSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import { ZodError } from "zod";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
-  // Artist routes
+  // Artist routes remain unchanged
   app.get("/api/artists", async (req, res) => {
     const artists = await storage.getAllArtists();
     res.json(artists);
@@ -22,11 +23,16 @@ export function registerRoutes(app: Express): Server {
       const artist = await storage.createArtist(artistData);
       res.status(201).json(artist);
     } catch (error) {
-      res.status(400).json({ error: "Invalid artist data" });
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        res.status(400).json({ error: validationError.message });
+      } else {
+        res.status(400).json({ error: "Invalid artist data" });
+      }
     }
   });
 
-  // Album routes
+  // Album routes with enhanced error handling
   app.get("/api/albums", async (req, res) => {
     const { artist_id, search } = req.query;
 
@@ -56,7 +62,10 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json(album);
     } catch (error) {
       console.error("Album validation error:", error);
-      if (error instanceof Error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        res.status(400).json({ error: validationError.message });
+      } else if (error instanceof Error) {
         res.status(400).json({ error: error.message });
       } else {
         res.status(400).json({ error: "An unknown error occurred" });
