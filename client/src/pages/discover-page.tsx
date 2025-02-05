@@ -5,15 +5,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Review } from "@shared/schema";
+import { Review, Album } from "@shared/schema";
 
 interface Recommendation {
-  recommendations: string[];
+  recommendations: Album[];
   explanation: string;
 }
 
 export default function DiscoverPage() {
   const { toast } = useToast();
+
+  const { data: albums, isLoading: isLoadingAlbums } = useQuery<Album[]>({
+    queryKey: ["/api/albums"],
+  });
 
   const { data: reviews } = useQuery<Review[]>({
     queryKey: ["/api/reviews"],
@@ -49,13 +53,6 @@ export default function DiscoverPage() {
     },
   });
 
-  // Mock album data - would come from MusicBrainz in production
-  const mockAlbumData = {
-    coverUrl: "https://images.unsplash.com/photo-1514924013411-cbf25faa35bb?w=400&h=400&fit=crop",
-    artistName: "The Imaginary Band",
-    genres: ["Alternative", "Indie Rock"],
-  };
-
   return (
     <Layout>
       <div className="container py-8">
@@ -68,7 +65,7 @@ export default function DiscoverPage() {
           </div>
         </div>
 
-        {isLoadingRecommendations ? (
+        {(isLoadingAlbums || isLoadingRecommendations) ? (
           <div className="flex items-center justify-center min-h-[400px]">
             <Loader2 className="h-8 w-8 animate-spin text-border" />
           </div>
@@ -87,16 +84,16 @@ export default function DiscoverPage() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {recommendations?.recommendations.map((album, index) => (
+              {(recommendations?.recommendations || albums)?.map((album) => (
                 <MusicCard
-                  key={index}
-                  albumTitle={album}
-                  artistName={mockAlbumData.artistName}
-                  coverUrl={mockAlbumData.coverUrl}
-                  genres={mockAlbumData.genres}
+                  key={album.id}
+                  albumTitle={album.title}
+                  artistName={album.artistId.toString()} // TODO: Fetch artist name
+                  coverUrl={album.coverUrl || "https://images.unsplash.com/photo-1514924013411-cbf25faa35bb?w=400&h=400&fit=crop"}
+                  genres={album.genres || []}
                   onClick={() => {
                     createReviewMutation.mutate({
-                      albumId: album,
+                      albumId: album.id,
                       rating: 0, // Would show rating dialog in production
                       review: "", // Would show review dialog in production
                     });
@@ -107,7 +104,7 @@ export default function DiscoverPage() {
           </>
         )}
 
-        {!reviews?.length && (
+        {!reviews?.length && !albums?.length && (
           <div className="text-center py-12">
             <Sparkles className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Start Rating Music</h3>
