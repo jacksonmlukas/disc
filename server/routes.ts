@@ -4,6 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { generateRecommendation, analyzeSentiment } from "./openai";
 import { insertArtistSchema, insertAlbumSchema } from "@shared/schema";
+import { fromZodError } from "zod-validation-error";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -48,15 +49,22 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/albums", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
+      console.log("Attempting to parse album data:", req.body);
       const albumData = insertAlbumSchema.parse(req.body);
+      console.log("Parsed album data:", albumData);
       const album = await storage.createAlbum(albumData);
       res.status(201).json(album);
     } catch (error) {
-      res.status(400).json({ error: "Invalid album data" });
+      console.error("Album validation error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: "An unknown error occurred" });
+      }
     }
   });
 
-  // Existing review routes
+  // Review routes
   app.get("/api/reviews", async (req, res) => {
     const reviews = await storage.getReviews();
     res.json(reviews);
@@ -72,7 +80,7 @@ export function registerRoutes(app: Express): Server {
     res.json(review);
   });
 
-  // Existing event routes
+  // Event routes
   app.get("/api/events/:location", async (req, res) => {
     const events = await storage.getEvents(req.params.location);
     res.json(events);
@@ -84,7 +92,7 @@ export function registerRoutes(app: Express): Server {
     res.json(event);
   });
 
-  // Existing recommendation and analysis routes
+  // Recommendation and analysis routes
   app.post("/api/recommendations", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const { likedAlbums, reviews } = req.body;

@@ -50,7 +50,6 @@ export const events = pgTable("events", {
   metadata: json("metadata")
 });
 
-// Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -58,11 +57,17 @@ export const insertUserSchema = createInsertSchema(users).pick({
 });
 
 export const insertArtistSchema = createInsertSchema(artists);
-export const insertAlbumSchema = createInsertSchema(albums);
+export const insertAlbumSchema = createInsertSchema(albums, {
+  title: z.string().min(1, "Title is required"),
+  artistId: z.number().positive("Artist ID must be positive"),
+  releaseDate: z.string().transform((str) => new Date(str)),
+  coverUrl: z.string().optional(),
+  genres: z.array(z.string()),
+  metadata: z.record(z.any()).optional(),
+}).omit({ id: true, createdAt: true });
 export const insertReviewSchema = createInsertSchema(reviews);
 export const insertEventSchema = createInsertSchema(events);
 
-// Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertArtist = z.infer<typeof insertArtistSchema>;
 export type InsertAlbum = z.infer<typeof insertAlbumSchema>;
