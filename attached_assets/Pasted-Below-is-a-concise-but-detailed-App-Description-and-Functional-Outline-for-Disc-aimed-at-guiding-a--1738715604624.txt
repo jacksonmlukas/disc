@@ -1,0 +1,138 @@
+Below is a concise but detailed App Description and Functional Outline for Disc, aimed at guiding a developer in the initial build. It covers key integrations, core menus, and primary functionalities that reflect your vision for a music discovery, review, and live event platform.
+
+1. Overview
+Disc is a free iOS app (initially) for music fans to:
+
+Rate & Review albums, songs, and artists.
+Discover new music through a hybrid recommendation system (collaborative filtering + LLM-based “why similar” explanations).
+Explore Live Events near them, bridging digital discovery with real-life shows.
+Integrate seamlessly with external streaming services (Spotify, Apple Music, etc.)—without hosting or streaming music internally.
+2. Core Functionalities
+2.1 User Registration & Profiles
+Sign-Up/Log-In
+
+Email & password or OAuth (Google, Apple, etc.).
+Basic profile data: username, avatar, location.
+Profile Page
+
+Displays user’s ratings, reviews, favorite genres, events attended.
+Option to connect external streaming accounts (Spotify/Apple Music) for playlist integration or “Now Playing” data.
+2.2 Rating & Reviewing
+Album/Song Database
+
+Store essential metadata (title, artist, cover art, etc.).
+Initially, allow user submissions for missing entries or integrate with a third-party music database (MusicBrainz, etc.).
+Rating System
+
+Simple 1–5 stars (or 1–10 scale).
+Aggregated average ratings per album/song.
+Review Text
+
+Users can write short or long-form text reviews.
+Option to include hashtags or keywords for better discovery.
+2.3 Recommendation Engine
+Collaborative Filtering
+
+“Users who liked X also liked Y” logic based on user ratings and interactions.
+LLM Analysis
+
+Integrate an LLM (via OpenAI API or similar) to parse user reviews and generate short explanations of why songs/albums are similar.
+Use embedding or text classification to group reviews by sentiment or descriptors (e.g., “mellow beat,” “heavy guitar,” “lyrically profound”).
+Recommendation Feed
+
+Main screen or dedicated tab that surfaces new albums/songs tailored to each user.
+Include short textual “why recommended” insights (LLM-generated) next to each item.
+2.4 Live Events
+Event Listings
+
+Integrate APIs like Songkick/Bandsintown to pull concert data by location.
+Display basic event info: venue, date/time, lineup.
+User Event Reviews
+
+After attending, users can rate the concert and write reviews.
+Photos or short commentary can be added (optional).
+Promoted Events (Future Monetization)
+
+Flag certain events as featured or sponsored in the events list (back-end toggle or separate API endpoint).
+2.5 Streaming Integrations (Links Only)
+Spotify/Apple Music Oauth
+
+Allow users to link their streaming accounts (scopes to read playlists or top tracks, if allowed by API).
+Make it easy to open album/song links in the respective streaming app. No direct streaming in-app.
+Deep Linking
+
+A user taps “Play on Spotify,” which opens Spotify with the chosen track or album.
+Possibly allow “Add to My Playlist” if the streaming service API supports write access.
+3. App Navigation & Menus
+3.1 Main Tabs/Sections (Suggested)
+Home/Feed
+
+Personalized recommendations: curated by collaborative filtering + LLM summaries.
+Latest community reviews from followed users or top reviewers.
+Search/Discover
+
+Browse or search by artist, album, song title.
+Filters for genre, rating, popularity, or user-defined tags.
+“Top Charts” vs. “Underground Picks” toggles for variety.
+Events/Live Music
+
+Location-based list of upcoming concerts.
+Sort by date, venue, or genre.
+Check-in or indicate “attended,” leading to a review prompt.
+Profile
+
+User’s own reviews, ratings, and event history.
+Settings for account info, streaming service links, notification preferences.
+3.2 Secondary Menus
+Review Submission/Editor: Minimal text editor with rating input, possible #hashtags or mention of other users/albums.
+Notifications (in a top-right icon or separate tab):
+Alerts for new followers, comments on reviews, recommended events, etc.
+Settings: Manage privacy, connectivity to streaming accounts, or switch location data on/off for events.
+4. Technology & Integration Points
+Backend
+
+Host user profiles, ratings, reviews, and event data in a secure database.
+Possibly use a combination of SQL (user auth, structured data) + NoSQL (reviews, social interactions).
+Music Database
+
+Integrate with an existing music database API (like MusicBrainz) or seed your own partial DB with popular albums/artists.
+Provide an admin console or user-driven submission for missing albums.
+Event Data
+
+Songkick API or Bandsintown for concert listings.
+Geolocation to fetch events near the user’s location.
+LLM Integration
+
+External API (OpenAI, Anthropic, etc.) to generate short text for album similarity, or do summarization of user reviews.
+Caching recommended: store AI-generated texts to reduce repetitive calls.
+Streaming Services
+
+Spotify/Apple Music OAuth flows for account linking (read user data if the user allows, open songs in the streaming app).
+Compliance with each platform’s API policies (e.g., rate limits, usage terms).
+5. Future Enhancements & Monetization
+In-App Ads
+Light banner ads or interstitials (careful to avoid user frustration).
+Promoted Events or Artist Spotlight
+Additional revenue from local venues or indie labels wanting to highlight shows/new releases.
+Premium Tier (Ad-Free, Extra Features)
+Potential pay-tier for power users or advanced analytics for artists/labels.
+6. Key Development Priorities
+Core MVP
+
+User registration & profiles
+Rating & review system (albums, songs)
+Basic event listing integration
+Minimal collaborative filtering for recommendation
+Simple UI with main tabs (Feed, Search, Events, Profile)
+LLM & Recommendation Refinement
+
+Once MVP is stable, integrate LLM for “why similar” explanations.
+Expand collaborative filtering as user data grows.
+Social & Community Tools
+
+Friend/follow system, comment threads, notifications.
+This can evolve after the initial release, but planning is crucial for user retention.
+Refined Monetization & Integrations
+
+Introduce sponsored event slots or optional ads as user numbers grow.
+Further streaming integrations if more platforms (e.g., YouTube Music, Tidal) are requested by users.
