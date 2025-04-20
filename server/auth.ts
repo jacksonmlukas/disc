@@ -93,24 +93,27 @@ export function setupAuth(app: Express) {
       req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
     }
     
-    passport.authenticate("local", (err: Error | null, user: Express.User | false, info: { message: string }) => {
-      if (err) {
-        return next(err);
-      }
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      req.login(user, (err) => {
+    passport.authenticate(
+      "local", 
+      (err: Error | null, user: SelectUser | false, info: { message: string } | undefined) => {
         if (err) {
           return next(err);
         }
-        return res.status(200).json(user);
-      });
-    })(req, res, next);
+        if (!user) {
+          return res.status(401).json({ message: "Invalid credentials" });
+        }
+        req.login(user, (loginErr: Error | null) => {
+          if (loginErr) {
+            return next(loginErr);
+          }
+          return res.status(200).json(user);
+        });
+      }
+    )(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
+    req.logout((err: Error | null) => {
       if (err) return next(err);
       res.sendStatus(200);
     });
