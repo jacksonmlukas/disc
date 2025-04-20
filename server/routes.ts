@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
+import { setupAuth, isAdmin } from "./auth";
 import { storage } from "./storage";
 import { generateRecommendation, analyzeSentiment } from "./openai";
 import { insertArtistSchema, insertAlbumSchema } from "@shared/schema";
@@ -9,6 +9,69 @@ import { ZodError } from "zod";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  // Admin Routes
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/admin/users/:userId", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const { isAdmin: makeAdmin } = req.body;
+      
+      if (typeof makeAdmin !== "boolean") {
+        return res.status(400).json({ message: "Invalid request. isAdmin field must be a boolean." });
+      }
+      
+      const user = await storage.updateUserAdmin(userId, makeAdmin);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user admin status:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/artists", isAdmin, async (req, res) => {
+    try {
+      const artists = await storage.getAllArtists();
+      res.json(artists);
+    } catch (error) {
+      console.error("Error fetching artists:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/albums", isAdmin, async (req, res) => {
+    try {
+      const albums = await storage.getAllAlbums();
+      res.json(albums);
+    } catch (error) {
+      console.error("Error fetching albums:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/events", isAdmin, async (req, res) => {
+    try {
+      // Get all events regardless of location for admin
+      const events = await storage.getAllEvents();
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   // Artist routes remain unchanged
   app.get("/api/artists", async (req, res) => {

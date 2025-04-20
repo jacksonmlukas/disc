@@ -15,6 +15,8 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  updateUserAdmin(userId: number, isAdmin: boolean): Promise<User | undefined>;
 
   // OAuth methods
   getUserByOAuthProvider(provider: string, providerId: string): Promise<User | undefined>;
@@ -28,6 +30,7 @@ export interface IStorage {
 
   // Event methods
   getEvents(location: string): Promise<Event[]>;
+  getAllEvents(): Promise<Event[]>;
   createEvent(event: Event): Promise<Event>;
 
   // Music database methods
@@ -68,6 +71,19 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+  
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+  
+  async updateUserAdmin(userId: number, isAdmin: boolean): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ isAdmin })
+      .where(eq(users.id, userId))
+      .returning();
     return user;
   }
 
@@ -131,6 +147,10 @@ export class DatabaseStorage implements IStorage {
 
   async getEvents(location: string): Promise<Event[]> {
     return db.select().from(events).where(eq(events.location, location));
+  }
+  
+  async getAllEvents(): Promise<Event[]> {
+    return db.select().from(events);
   }
 
   async createEvent(event: Event): Promise<Event> {

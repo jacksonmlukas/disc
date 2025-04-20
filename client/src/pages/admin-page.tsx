@@ -197,7 +197,7 @@ function UsersPanel() {
                     <Badge variant="outline">User</Badge>
                   )}
                 </TableCell>
-                <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}</TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
@@ -478,7 +478,7 @@ function EventsPanel() {
                 <TableCell className="font-medium">{event.title}</TableCell>
                 <TableCell>{event.artistName}</TableCell>
                 <TableCell>{event.venue}</TableCell>
-                <TableCell>{new Date(event.date).toLocaleDateString()}</TableCell>
+                <TableCell>{event.date ? new Date(event.date).toLocaleDateString() : "—"}</TableCell>
                 <TableCell>{event.location}</TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
