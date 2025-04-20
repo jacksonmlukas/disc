@@ -22,7 +22,7 @@ export const users = pgTable("users", {
   location: text("location"),
   profileImage: text("profile_image"),
   email: text("email"),
-  isAdmin: pgBoolean("is_admin").default(false).notNull(),
+  isAdmin: pgBoolean("is_admin").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -70,7 +70,6 @@ export const insertUserSchema = createInsertSchema(users, {
   password: z.string().optional(),
   email: z.string().email().optional(),
   profileImage: z.string().url().optional(),
-  isAdmin: z.boolean().optional().default(false),
 });
 
 export const insertOAuthProviderSchema = createInsertSchema(oauthProviders);

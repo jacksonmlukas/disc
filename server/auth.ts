@@ -43,7 +43,7 @@ export function isAdmin(req: Request, res: Response, next: NextFunction) {
   }
   
   const user = req.user as SelectUser;
-  if (!user.isAdmin) {
+  if (user.isAdmin !== true) {
     return res.status(403).json({ message: "Access denied. Admin privileges required." });
   }
   
