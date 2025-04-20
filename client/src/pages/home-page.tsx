@@ -33,6 +33,11 @@ export default function HomePage() {
             <Button asChild variant="secondary">
               <Link href="/events">Find Events</Link>
             </Button>
+            {user?.isAdmin && (
+              <Button asChild variant="outline">
+                <Link href="/admin">Admin Dashboard</Link>
+              </Button>
+            )}
           </div>
         </div>
 
