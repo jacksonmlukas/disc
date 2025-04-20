@@ -262,12 +262,12 @@ export function setupAuth(app: Express) {
       }
       
       const spotifyApi = new SpotifyWebApi({
-        clientId: process.env.SPOTIFY_CLIENT_ID,
-        clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+        clientId: process.env.SPOTIFY_CLIENT_ID || "",
+        clientSecret: process.env.SPOTIFY_CLIENT_SECRET || "",
       });
       
       // Set the access token
-      spotifyApi.setAccessToken(oauthProvider.accessToken);
+      spotifyApi.setAccessToken(oauthProvider.accessToken || "");
       
       // Get user's Spotify profile
       const response = await spotifyApi.getMe();
@@ -285,7 +285,7 @@ export function setupAuth(app: Express) {
     }
     
     // Store the user's ID in the session to retrieve later
-    req.session.linkUserId = (req.user as SelectUser).id;
+    (req.session as any).linkUserId = (req.user as SelectUser).id;
     
     passport.authenticate("spotify", {
       scope: [
@@ -303,8 +303,36 @@ export function setupAuth(app: Express) {
     "/api/link/spotify/callback",
     passport.authenticate("spotify", { failureRedirect: "/account?error=spotify-link-failed" }),
     async (req, res) => {
-      // Link was successful, redirect to account page
-      res.redirect("/account?success=spotify-linked");
+      try {
+        // Get the linkUserId from the session
+        const linkUserId = (req.session as any).linkUserId;
+        
+        if (!linkUserId) {
+          return res.redirect("/account?error=spotify-link-failed-no-user");
+        }
+        
+        // Get the current user from the authentication
+        if (!req.user || !req.isAuthenticated()) {
+          return res.redirect("/account?error=spotify-link-failed-not-authenticated");
+        }
+        
+        const user = req.user as SelectUser;
+        const spotifyUser = await storage.getUserByOAuthProvider("spotify", user.id.toString());
+        
+        if (spotifyUser && spotifyUser.id !== linkUserId) {
+          // This Spotify account is already linked to a different user
+          return res.redirect("/account?error=spotify-already-linked");
+        }
+        
+        // Link successful, clear linkUserId from session
+        delete (req.session as any).linkUserId;
+        
+        // Redirect to account page with success message
+        res.redirect("/account?success=spotify-linked");
+      } catch (error) {
+        console.error("Error linking Spotify account:", error);
+        res.redirect("/account?error=spotify-link-failed-server-error");
+      }
     }
   );
   
@@ -323,12 +351,12 @@ export function setupAuth(app: Express) {
       }
       
       const spotifyApi = new SpotifyWebApi({
-        clientId: process.env.SPOTIFY_CLIENT_ID,
-        clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+        clientId: process.env.SPOTIFY_CLIENT_ID || "",
+        clientSecret: process.env.SPOTIFY_CLIENT_SECRET || "",
       });
       
       // Set the access token
-      spotifyApi.setAccessToken(oauthProvider.accessToken);
+      spotifyApi.setAccessToken(oauthProvider.accessToken || "");
       
       // Check if token has expired
       const now = new Date();
@@ -338,7 +366,7 @@ export function setupAuth(app: Express) {
           return res.status(401).json({ message: "Spotify access expired, please reconnect your account" });
         }
         
-        spotifyApi.setRefreshToken(oauthProvider.refreshToken);
+        spotifyApi.setRefreshToken(oauthProvider.refreshToken || "");
         const refreshData = await spotifyApi.refreshAccessToken();
         
         // Update tokens in database
