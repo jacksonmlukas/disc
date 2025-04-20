@@ -5,8 +5,9 @@ import { insertUserSchema } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Music4 } from "lucide-react";
 import { Redirect } from "wouter";
 
@@ -17,6 +18,7 @@ export default function AuthPage() {
     defaultValues: {
       username: "",
       password: "",
+      rememberMe: false,
     },
   });
 
@@ -64,12 +66,32 @@ export default function AuthPage() {
                       control={loginForm.control}
                       name="password"
                       render={({ field }) => (
-                        <FormItem className="mb-6">
+                        <FormItem className="mb-4">
                           <FormLabel>Password</FormLabel>
                           <FormControl>
                             <Input type="password" {...field} />
                           </FormControl>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={loginForm.control}
+                      name="rememberMe"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 mb-6">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>Remember me</FormLabel>
+                            <FormDescription>
+                              Keep me logged in on this device
+                            </FormDescription>
+                          </div>
                         </FormItem>
                       )}
                     />
