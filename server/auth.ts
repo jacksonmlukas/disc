@@ -36,6 +36,20 @@ async function comparePasswords(supplied: string, stored: string | null) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+// Middleware to check if user is admin
+export function isAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+  
+  const user = req.user as SelectUser;
+  if (!user.isAdmin) {
+    return res.status(403).json({ message: "Access denied. Admin privileges required." });
+  }
+  
+  next();
+}
+
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "disc-music-discovery-secret",

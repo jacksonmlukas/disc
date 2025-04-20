@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, json, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, json, jsonb, boolean as pgBoolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   location: text("location"),
   profileImage: text("profile_image"),
   email: text("email"),
+  isAdmin: pgBoolean("is_admin").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -69,12 +70,7 @@ export const insertUserSchema = createInsertSchema(users, {
   password: z.string().optional(),
   email: z.string().email().optional(),
   profileImage: z.string().url().optional(),
-}).pick({
-  username: true,
-  password: true,
-  location: true,
-  email: true,
-  profileImage: true,
+  isAdmin: z.boolean().optional().default(false),
 });
 
 export const insertOAuthProviderSchema = createInsertSchema(oauthProviders);
