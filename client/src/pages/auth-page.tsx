@@ -8,11 +8,72 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Music4 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Music4, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Redirect } from "wouter";
+import { Separator } from "@/components/ui/separator";
+import { SiSpotify } from "react-icons/si";
+import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
+  const { toast } = useToast();
+  
+  // Get URL query parameters
+  const searchParams = new URLSearchParams(window.location.search);
+  const error = searchParams.get("error");
+  const success = searchParams.get("success");
+  
+  // Show toast notifications for OAuth-related messages
+  useEffect(() => {
+    if (error) {
+      let errorMessage = "Authentication failed";
+      
+      // Map error codes to user-friendly messages
+      switch (error) {
+        case "spotify-auth-failed":
+          errorMessage = "Spotify authentication failed. Please try again.";
+          break;
+        case "spotify-link-failed":
+          errorMessage = "Failed to link your Spotify account. Please try again.";
+          break;
+        case "spotify-link-failed-no-user":
+          errorMessage = "Session expired. Please log in and try again.";
+          break;
+        case "spotify-already-linked":
+          errorMessage = "This Spotify account is already linked to another user.";
+          break;
+        default:
+          errorMessage = "An error occurred during authentication. Please try again.";
+      }
+      
+      toast({
+        title: "Authentication Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+    
+    if (success) {
+      let successMessage = "Authentication successful";
+      
+      // Map success codes to user-friendly messages
+      switch (success) {
+        case "spotify-linked":
+          successMessage = "Your Spotify account has been linked successfully!";
+          break;
+        default:
+          successMessage = "Authentication successful!";
+      }
+      
+      toast({
+        title: "Success",
+        description: successMessage,
+        variant: "default",
+      });
+    }
+  }, [error, success, toast]);
   
   const loginForm = useForm({
     defaultValues: {
@@ -103,6 +164,27 @@ export default function AuthPage() {
                       Login
                     </Button>
                   </form>
+                  
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <Separator className="w-full" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="bg-background px-2 text-sm text-muted-foreground">
+                        or continue with
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    className="w-full flex items-center gap-2"
+                    onClick={() => window.location.href = "/api/auth/spotify"}
+                  >
+                    <SiSpotify className="text-[#1DB954]" size={18} />
+                    <span>Continue with Spotify</span>
+                  </Button>
                 </Form>
               </TabsContent>
 
@@ -156,6 +238,27 @@ export default function AuthPage() {
                       Register
                     </Button>
                   </form>
+                  
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <Separator className="w-full" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="bg-background px-2 text-sm text-muted-foreground">
+                        or continue with
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    className="w-full flex items-center gap-2"
+                    onClick={() => window.location.href = "/api/auth/spotify"}
+                  >
+                    <SiSpotify className="text-[#1DB954]" size={18} />
+                    <span>Sign up with Spotify</span>
+                  </Button>
                 </Form>
               </TabsContent>
             </Tabs>
