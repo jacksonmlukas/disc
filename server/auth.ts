@@ -1,15 +1,21 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Strategy as SpotifyStrategy } from "passport-spotify";
+import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
+import { User as SelectUser, InsertUser, OAuthProvider, InsertOAuthProvider } from "@shared/schema";
+import SpotifyWebApi from "spotify-web-api-node";
+import { randomUUID } from "crypto";
 
 declare global {
   namespace Express {
     interface User extends SelectUser {}
+    interface Session {
+      linkUserId?: number;
+    }
   }
 }
 
@@ -21,7 +27,9 @@ async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+async function comparePasswords(supplied: string, stored: string | null) {
+  if (!stored) return false;
+  
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
@@ -49,15 +57,116 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Local strategy for username/password login
   passport.use(
     new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
-      } else {
+      try {
+        const user = await storage.getUserByUsername(username);
+        if (!user || !user.password) {
+          return done(null, false, { message: "Invalid credentials" });
+        }
+        
+        if (!(await comparePasswords(password, user.password))) {
+          return done(null, false, { message: "Invalid credentials" });
+        }
+        
         return done(null, user);
+      } catch (error) {
+        return done(error as Error);
       }
     }),
+  );
+  
+  // Spotify OAuth strategy
+  const spotifyCallbackURL = process.env.NODE_ENV === "production" 
+    ? "https://disc.replit.app/api/auth/spotify/callback"
+    : "http://localhost:5000/api/auth/spotify/callback";
+    
+  passport.use(
+    new SpotifyStrategy(
+      {
+        clientID: process.env.SPOTIFY_CLIENT_ID!,
+        clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
+        callbackURL: spotifyCallbackURL,
+        scope: [
+          "user-read-email", 
+          "user-read-private", 
+          "user-top-read",
+          "user-read-recently-played",
+          "user-library-read"
+        ],
+      },
+      async (accessToken, refreshToken, expiresIn, profile, done) => {
+        try {
+          // Calculate token expiration date
+          const expiresAt = new Date();
+          expiresAt.setSeconds(expiresAt.getSeconds() + expiresIn);
+          
+          // Check if user already exists with this Spotify ID
+          let user = await storage.getUserByOAuthProvider("spotify", profile.id);
+          
+          if (user) {
+            // User exists, update their OAuth tokens
+            const oauthProvider = await storage.getOAuthProviderByUserId(user.id, "spotify");
+            
+            if (oauthProvider) {
+              await storage.updateOAuthProviderTokens(
+                oauthProvider.id,
+                accessToken,
+                refreshToken,
+                expiresAt
+              );
+            }
+            
+            return done(null, user);
+          }
+          
+          // User doesn't exist, create a new one
+          const username = profile.displayName || `spotify_${profile.id}`;
+          let email: string | undefined = undefined;
+          let photo: string | undefined = undefined;
+          
+          // Extract email and profile image if available
+          if (profile.emails && profile.emails.length > 0) {
+            email = profile.emails[0].value;
+          }
+          
+          if (profile.photos && profile.photos.length > 0) {
+            photo = profile.photos[0];
+          }
+          
+          // Create unique username if it already exists
+          let finalUsername = username;
+          const existingUser = await storage.getUserByUsername(username);
+          
+          if (existingUser) {
+            finalUsername = `${username}_${randomUUID().substring(0, 8)}`;
+          }
+          
+          // Create the new user
+          user = await storage.createUser({
+            username: finalUsername,
+            email,
+            profileImage: photo,
+          });
+          
+          // Store OAuth provider info
+          await storage.createOAuthProvider({
+            userId: user.id,
+            provider: "spotify",
+            providerId: profile.id,
+            accessToken,
+            refreshToken,
+            tokenExpiresAt: expiresAt,
+            profileData: profile,
+          });
+          
+          return done(null, user);
+        } catch (error) {
+          return done(error as Error);
+        }
+      }
+    )
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
@@ -122,5 +231,137 @@ export function setupAuth(app: Express) {
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
+  });
+  
+  // Spotify OAuth routes
+  app.get("/api/auth/spotify", passport.authenticate("spotify"));
+  
+  app.get(
+    "/api/auth/spotify/callback",
+    passport.authenticate("spotify", {
+      failureRedirect: "/auth?error=spotify-auth-failed",
+    }),
+    (req, res) => {
+      // Successful authentication, redirect to home page
+      res.redirect("/");
+    }
+  );
+  
+  // Get current user's Spotify profile
+  app.get("/api/spotify/me", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    try {
+      const user = req.user as SelectUser;
+      const oauthProvider = await storage.getOAuthProviderByUserId(user.id, "spotify");
+      
+      if (!oauthProvider) {
+        return res.status(404).json({ message: "No Spotify account connected" });
+      }
+      
+      const spotifyApi = new SpotifyWebApi({
+        clientId: process.env.SPOTIFY_CLIENT_ID,
+        clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+      });
+      
+      // Set the access token
+      spotifyApi.setAccessToken(oauthProvider.accessToken);
+      
+      // Get user's Spotify profile
+      const response = await spotifyApi.getMe();
+      res.json(response.body);
+    } catch (error) {
+      console.error("Error getting Spotify profile:", error);
+      res.status(500).json({ message: "Failed to get Spotify profile" });
+    }
+  });
+  
+  // Link Spotify account to existing user
+  app.get("/api/link/spotify", (req, res, next) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "You must be logged in to link accounts" });
+    }
+    
+    // Store the user's ID in the session to retrieve later
+    req.session.linkUserId = (req.user as SelectUser).id;
+    
+    passport.authenticate("spotify", {
+      scope: [
+        "user-read-email", 
+        "user-read-private", 
+        "user-top-read",
+        "user-read-recently-played",
+        "user-library-read"
+      ]
+    })(req, res, next);
+  });
+  
+  // Callback for linking Spotify account
+  app.get(
+    "/api/link/spotify/callback",
+    passport.authenticate("spotify", { failureRedirect: "/account?error=spotify-link-failed" }),
+    async (req, res) => {
+      // Link was successful, redirect to account page
+      res.redirect("/account?success=spotify-linked");
+    }
+  );
+  
+  // Get user's top Spotify tracks
+  app.get("/api/spotify/top-tracks", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    try {
+      const user = req.user as SelectUser;
+      const oauthProvider = await storage.getOAuthProviderByUserId(user.id, "spotify");
+      
+      if (!oauthProvider) {
+        return res.status(404).json({ message: "No Spotify account connected" });
+      }
+      
+      const spotifyApi = new SpotifyWebApi({
+        clientId: process.env.SPOTIFY_CLIENT_ID,
+        clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+      });
+      
+      // Set the access token
+      spotifyApi.setAccessToken(oauthProvider.accessToken);
+      
+      // Check if token has expired
+      const now = new Date();
+      if (oauthProvider.tokenExpiresAt && oauthProvider.tokenExpiresAt < now) {
+        // Token has expired, try to refresh it
+        if (!oauthProvider.refreshToken) {
+          return res.status(401).json({ message: "Spotify access expired, please reconnect your account" });
+        }
+        
+        spotifyApi.setRefreshToken(oauthProvider.refreshToken);
+        const refreshData = await spotifyApi.refreshAccessToken();
+        
+        // Update tokens in database
+        const expiresAt = new Date();
+        expiresAt.setSeconds(expiresAt.getSeconds() + refreshData.body.expires_in);
+        
+        await storage.updateOAuthProviderTokens(
+          oauthProvider.id,
+          refreshData.body.access_token,
+          oauthProvider.refreshToken,
+          expiresAt
+        );
+        
+        // Update access token for current request
+        spotifyApi.setAccessToken(refreshData.body.access_token);
+      }
+      
+      // Get user's top tracks
+      const response = await spotifyApi.getMyTopTracks({ limit: 20, time_range: 'medium_term' });
+      res.json(response.body);
+    } catch (error) {
+      console.error("Error getting Spotify top tracks:", error);
+      res.status(500).json({ message: "Failed to get Spotify top tracks" });
+    }
   });
 }
