@@ -2,11 +2,26 @@ import { pgTable, text, serial, integer, timestamp, json, jsonb } from "drizzle-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const oauthProviders = pgTable("oauth_providers", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  provider: text("provider").notNull(), // "spotify" or "apple"
+  providerId: text("provider_id").notNull(),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  profileData: jsonb("profile_data"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),  // Can be null for OAuth users
   location: text("location"),
+  profileImage: text("profile_image"),
+  email: text("email"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -50,11 +65,19 @@ export const events = pgTable("events", {
   metadata: json("metadata")
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
+export const insertUserSchema = createInsertSchema(users, {
+  password: z.string().optional(),
+  email: z.string().email().optional(),
+  profileImage: z.string().url().optional(),
+}).pick({
   username: true,
   password: true,
   location: true,
+  email: true,
+  profileImage: true,
 });
+
+export const insertOAuthProviderSchema = createInsertSchema(oauthProviders);
 
 export const insertArtistSchema = createInsertSchema(artists);
 export const insertAlbumSchema = createInsertSchema(albums, {
@@ -73,9 +96,11 @@ export type InsertArtist = z.infer<typeof insertArtistSchema>;
 export type InsertAlbum = z.infer<typeof insertAlbumSchema>;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type InsertOAuthProvider = z.infer<typeof insertOAuthProviderSchema>;
 
 export type User = typeof users.$inferSelect;
 export type Artist = typeof artists.$inferSelect;
 export type Album = typeof albums.$inferSelect;
 export type Review = typeof reviews.$inferSelect;
 export type Event = typeof events.$inferSelect;
+export type OAuthProvider = typeof oauthProviders.$inferSelect;

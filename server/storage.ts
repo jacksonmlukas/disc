@@ -1,6 +1,7 @@
-import { users, reviews, events, artists, albums, 
+import { users, reviews, events, artists, albums, oauthProviders,
   type User, type Review, type Event, type InsertUser,
-  type Artist, type Album, type InsertArtist, type InsertAlbum } from "@shared/schema";
+  type Artist, type Album, type InsertArtist, type InsertAlbum,
+  type OAuthProvider, type InsertOAuthProvider } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import session from "express-session";
@@ -15,6 +16,12 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
+  // OAuth methods
+  getUserByOAuthProvider(provider: string, providerId: string): Promise<User | undefined>;
+  createOAuthProvider(oauthProvider: InsertOAuthProvider): Promise<OAuthProvider>;
+  getOAuthProviderByUserId(userId: number, provider: string): Promise<OAuthProvider | undefined>;
+  updateOAuthProviderTokens(id: number, accessToken: string, refreshToken: string | null, expiresAt: Date): Promise<OAuthProvider>;
+  
   // Review methods
   getReviews(): Promise<Review[]>;
   createReview(review: Review): Promise<Review>;
@@ -62,6 +69,55 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  // OAuth methods
+  async getUserByOAuthProvider(provider: string, providerId: string): Promise<User | undefined> {
+    const [result] = await db
+      .select({ user: users })
+      .from(oauthProviders)
+      .innerJoin(users, eq(oauthProviders.userId, users.id))
+      .where(
+        sql`${oauthProviders.provider} = ${provider} AND ${oauthProviders.providerId} = ${providerId}`
+      );
+    
+    return result?.user;
+  }
+
+  async createOAuthProvider(oauthProvider: InsertOAuthProvider): Promise<OAuthProvider> {
+    const [newProvider] = await db.insert(oauthProviders).values(oauthProvider).returning();
+    return newProvider;
+  }
+
+  async getOAuthProviderByUserId(userId: number, provider: string): Promise<OAuthProvider | undefined> {
+    const [oauthProvider] = await db
+      .select()
+      .from(oauthProviders)
+      .where(
+        sql`${oauthProviders.userId} = ${userId} AND ${oauthProviders.provider} = ${provider}`
+      );
+    
+    return oauthProvider;
+  }
+
+  async updateOAuthProviderTokens(
+    id: number, 
+    accessToken: string, 
+    refreshToken: string | null, 
+    expiresAt: Date
+  ): Promise<OAuthProvider> {
+    const [updatedProvider] = await db
+      .update(oauthProviders)
+      .set({
+        accessToken,
+        refreshToken,
+        tokenExpiresAt: expiresAt,
+        updatedAt: new Date()
+      })
+      .where(eq(oauthProviders.id, id))
+      .returning();
+    
+    return updatedProvider;
   }
 
   async getReviews(): Promise<Review[]> {
